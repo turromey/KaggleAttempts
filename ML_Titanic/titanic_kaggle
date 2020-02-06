@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov  1 18:02:30 2019
+
+@author: TGSR
+"""
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import os
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
+
+from IPython.display import FileLink
+
+
+
+
+test = pd.read_csv("test.csv")
+train = pd.read_csv("train.csv")
+
+
+
+
+
+sex_pivot = train.pivot_table(index = "Sex", values = "Survived")
+sex_pivot.plot.bar()
+plt.show()
+
+class_pivot = train.pivot_table(index = "Pclass", values = "Survived")
+class_pivot.plot.bar()
+plt.show()
+
+
+
+print(train["Age"].describe())
+
+
+
+
+survived = train[train["Survived"] == 1]
+died = train[train["Survived"] == 0]
+survived["Age"].plot.hist(alpha=0.5, color='red', bins = 50)
+died["Age"].plot.hist(alpha=0.5, color='blue', bins = 50)
+plt.legend(['Survived', 'Died'])
+plt.show()
+
+
+
+
+
+
+def process_age(df, cut_points, label_names):
+    df['Age'] = df['Age'].fillna(-0.5)
+    df['Age_categories'] = pd.cut(df['Age'], cut_points, labels=label_names)
+    return df
+
+cut_points = [-1, 0, 5, 12, 18, 35, 60, 100]
+label_names = ['Missing', 'Infant', 'Child', 'Teenager', 'Young Adult', 'Adult', 'Senior']
+
+train = process_age(train, cut_points, label_names)
+test = process_age(test, cut_points, label_names)
+
+age_pivot = train.pivot_table(index='Age_categories', values='Survived')
+age_pivot.plot.bar()
+plt.show()
+
+
+
+
+
+
+
+
+def create_dummies(df, column_name):
+    dummies = pd.get_dummies(df[column_name], prefix=column_name)
+    df = pd.concat([df, dummies], axis=1)
+    return df
+
+cols = ['Pclass', 'Sex', 'Age_categories']
+
+for col in cols:
+    train = create_dummies(train, col)
+    test = create_dummies(test, col)
+    
+train.head(1)
+
+
+
+
+
+lr = LogisticRegression()
+
+columns = ['Pclass_1', 'Pclass_2', 'Pclass_3', 'Sex_female', 'Sex_male',
+       'Age_categories_Missing','Age_categories_Infant',
+       'Age_categories_Child', 'Age_categories_Teenager',
+       'Age_categories_Young Adult', 'Age_categories_Adult',
+       'Age_categories_Senior']
+lr.fit(train[columns], train['Survived'])
+
+holdout = test
+
+all_X = train[columns]
+all_y = train['Survived']
+
+train_X, test_X, train_y, test_y = train_test_split(all_X, all_y, test_size=0.20, random_state=0)
+
+lr.fit(train_X, train_y)
+
+predictions = lr.predict(test_X)
+
+
+
+
+
+
+
+
+
+
+accuracy = accuracy_score(test_y, predictions)
+
+print(accuracy)
+
+scores = cross_val_score(lr, all_X, all_y, cv=10)
+accuracy = np.mean(scores)
+
+print(scores)
+print(accuracy)
+
+columns = ['Pclass_1', 'Pclass_2', 'Pclass_3', 'Sex_female', 'Sex_male',
+       'Age_categories_Missing','Age_categories_Infant',
+       'Age_categories_Child', 'Age_categories_Teenager',
+       'Age_categories_Young Adult', 'Age_categories_Adult',
+       'Age_categories_Senior']
+
+lr.fit(all_X, all_y)
+holdout_predictions = lr.predict(holdout[columns])
+
+holdout_ids = holdout["PassengerId"]
+submission_df = {"PassengerId": holdout_ids, 
+                 "Survived" : holdout_predictions}
+
+submission_1 = pd.DataFrame(submission_df)
+
+#submission_1.to_csv("submission_1.csv",index=False)
+
+
+train_2 = pd.read_csv("test.csv")
+test_2 = pd.read_csv("train.csv")
+
+
+def process_age_2(df):
+    df["Age"] = df["Age"].fillna(-0.5)
+    cut_points = [-1, 0, 5, 12, 18, 35, 60, 100]
+    label_names = ["Missing", "Infant", "Child", "Teenager", "Young Adult", "Adult", "Senior"]
+    df["Age_categories"] = pd.cut(df["Age"], cut_points, labels=label_names)
+    return df
+
+def create_dummies_2(df, column_name):
+    dummies = pd.get_dummies(df[column_name], prefix=column_name)
+    df = pd.concat([df, dummies], axis=1)
+    return df
+
+train_2 = process_age_2(train_2)
+test_2 = process_age_2(test_2)
+
+columns = ['Age_categories', 'Pclass', 'Sex']
+
+for column in columns:
+    train_2 = create_dummies_2(train_2, column)
+    test_2 = create_dummies_2(test_2, column)
+    
+print(train_2.columns)
+print(test_2.columns)
+
+remaining_columns = ['SibSp', 'Parch', 'Fare', 'Cabin', 'Embarked']
+print(train[remaining_columns].head())
+
+print(train[remaining_columns].describe(include = 'all', percentiles=[]))
+
+
